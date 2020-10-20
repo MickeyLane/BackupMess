@@ -73,12 +73,98 @@ foreach my $switch (@ARGV) {
     }
 
     print ("Don't know what to do with $switch\n");
-    exit (1);
+    die;
 }
 
 if (length ($drive) != 1) {
     print ("No drive specified\n");
-    exit (1);
+    die;
 }
 
 print ("Checking drive $drive\n");
+
+my $cwd = Cwd::cwd();
+print ("\$cwd = $cwd\n");
+
+chdir ("$drive:");
+
+$cwd = Cwd::cwd();
+print ("\$cwd = $cwd\n");
+
+my $test_drive_root = "$drive:";
+my $test_drive_id_file = "$test_drive_root\.backup_mess_id";
+
+my @id_file_records;
+
+open (FILE, "<", $test_drive_id_file) or die "Can't open $test_drive_id_file: $!";
+
+while (my $r = <FILE>) {
+    $r =~ s/[\r\n]+//;
+    push (@id_file_records, $r);
+}
+
+close (FILE);
+
+# foreach my $r (@id_file_records) {
+#     print ("$r\n");
+# }
+
+my @manual_backup_dirs;
+my @website_backup_dirs;
+my @fq_dirs_tested;
+my @fq_dirs_to_test_list = $test_drive_root;
+my $count = @fq_dirs_to_test_list;
+while ($count > 0) {
+    # print ("$count\n");
+    my $fq_dir = shift @fq_dirs_to_test_list;
+    push (@fq_dirs_tested, $fq_dir);
+    opendir (DIR, $fq_dir) or die "Can't open $fq_dir: $!";
+    while (my $ff = readdir (DIR)) {
+        if ($ff eq 'System Volume Information') {
+            next;
+        }
+        elsif ($ff eq '.' || $ff eq '..') {
+            next;
+        }
+        elsif ($ff eq '$RECYCLE.BIN') {
+            next;
+        }
+        
+        if (-d "$fq_dir/$ff") {
+            push (@fq_dirs_to_test_list, "$fq_dir/$ff");
+        }
+        else {
+            next;
+        }
+
+
+    }
+    close (DIR);
+    $count = @fq_dirs_to_test_list;
+}
+
+$count = @fq_dirs_tested;
+print ("\nThere are $count directories on $drive:\n");
+
+# foreach my $d (@fq_dir_list) {
+#     print ("$d\n");
+# }
+
+
+
+# sub read_dir {
+#     my $fq_dir = shift;
+
+#     my @fq_dir_list;
+    
+#     opendir (DIR, $fq_dir) or die "Can't open $fq_dir: $!";
+#     while (my $ff = readdir (DIR)) {
+#         my $possible_fq_dir = "$fq_dir/$ff";
+#         if (-d $possible_fq_dir) {
+#             push (@fq_dir_list, $possible_fq_dir);
+#         }
+#     }
+#     close (DIR);
+
+#     return (\@fq_dir_list);
+# }
