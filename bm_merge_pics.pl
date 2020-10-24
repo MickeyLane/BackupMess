@@ -15,14 +15,17 @@ use strict;
 use File::Find;           
 use File::chdir;
 use File::Basename;
+# use File::DirCompare;
+use File::Copy;
 use Cwd qw(cwd);
 use List::Util qw (shuffle);
 use POSIX;
-use File::Copy;
 use DateTime;
 use List::Util qw (max);
 
 use lib '.';
+use bm_merge_pics_a;
+use bm_merge_pics_b;
 
 package main;
 
@@ -35,6 +38,11 @@ package main;
 my $dir_to_test = '';
 my $dir_to_test_is_just_a_date_string = 0;
 my $checked_mark = '+';
+
+# find (\&initial_find_function, 'E:/Picture Backups');
+
+
+# exit (1);
 
 my $root = 'E:/Picture Backups';
 my @unsorted_list;
@@ -129,95 +137,33 @@ print ("List lens are $list_to_prune_count and $other_list_count\n");
 my $flag;
 for (my $l2p = 0; $l2p < $list_to_prune_count; $l2p++) {
     for (my $ol = 0; $ol < $other_list_count; $ol++) {
-        my $a1 = $list_to_prune[$l2p];
-        my $b1 = $other_list[$ol];
+        my $prune = $list_to_prune[$l2p];
+        my $other = $other_list[$ol];
 
-        my $i = rindex ($a1, '/');
-        my $a2 = substr ($a1, $i);
+        my $i = rindex ($prune, '/');
+        my $prune_name = substr ($prune, $i);
 
-        $i = rindex ($b1, '/');
-        my $b2 = substr ($b1, $i);
+        $i = rindex ($other, '/');
+        my $other_name = substr ($other, $i);
 
-        if ($a2 eq $b2) {
-            my $same = compare_year_dirs ($a1, $b1);
+        if ($prune_name eq $other_name) {
+            # my $same = compare_year_dirs ($prune, $other);
+            my ($prune_files_ptr, $prune_files_count, $other_files_ptr, $other_files_count) =
+                bm_merge_pics_a::inventory_year_dirs ($prune, $other);
+
+            if ($prune_files_count > 0 && $prune_files_count == $other_files_count) {
+                my $dirs_are_same = bm_merge_pics_b::compare_same_len_dirs ($prune_files_ptr, $other_files_ptr);
+                # File::DirCompare->compare ($prune, $other, sub {$dirs_are_same = 0});
+
+                if ($dirs_are_same) {
+                    print ("SAME\n");
+                }
+            }
         }
     }
 }
 
-sub compare_year_dirs {
-    my ($a, $b) = @_;
-    
-    print ("Compare $a and $b\n");
 
-    return (0);
-}
-
-# my $string = sprintf ("%04d %02d %02d", $youngest_dt->year(), $youngest_dt->month(), $youngest_dt->day());
-# print ("Youngest file found = $string\n");
-# print ("Name = $youngest_filename\n");
-
-# my $existing_paren_string = '';
-# my $existing_paren_date = '';
-# my $bare_dir_name;
-# my $possible_new_dir_name;
-
-# if ($dir_to_test_is_just_a_date_string) {
-#     #
-#     # Dir is <drive>:\<path>\YYYY MM DD
-#     #
-#     my $i = rindex ($dir_to_test, '\\');
-#     my $left = substr ($dir_to_test, 0, $i);
-#     $possible_new_dir_name = "$left/$string $checked_mark";
-# }
-# else {
-#     #
-#     # Does dir already have a date paren?
-#     #
-#     my $left_paren = index ($dir_to_test, '(');
-#     if ($left_paren != -1) {
-#         #
-#         # Dir name already has "(...)"
-#         #
-#         my $right_paren = rindex ($dir_to_test, ')');
-#         my $len = $right_paren - $left_paren + 1;
-#         $existing_paren_string = substr ($dir_to_test, $left_paren, $len);
-#         $existing_paren_date = substr ($existing_paren_string, 1, length ($existing_paren_string) - 2);
-#         print ("\$existing_paren_string = \"$existing_paren_string\"\n");
-#         print ("\$existing_paren_date = \"$existing_paren_date\"\n");
-#         $bare_dir_name = substr ($dir_to_test , 0, $left_paren - 1);
-#         print ("\$bare_dir_name = \"$bare_dir_name\"\n");
-
-#         $possible_new_dir_name = "$bare_dir_name ($string $checked_mark)";
-#     }
-#     else {
-#         $possible_new_dir_name = "$dir_to_test ($string $checked_mark)";
-#     }
-# }
-
-# if (-e $possible_new_dir_name) {
-#     print ("Possible new dir name \"$possible_new_dir_name\" already exists!\n");
-#     exit (1);
-# }
-
-# my $new_dir_name;
-# my $rename_flag = 0;
-# if ($dir_to_test ne $possible_new_dir_name) {
-#     print ("Rename \"$dir_to_test\" to \"$possible_new_dir_name\" [y/n] ");
-
-#     my $choice_string = uc <STDIN>;  # force uppercase
-#     $choice_string =~ s/[\r\n]+//;
-
-#     if ($choice_string eq 'Y') {
-#         $new_dir_name = $possible_new_dir_name;
-#         $rename_flag = 1;
-#     }
-# }
-
-# if ($rename_flag) {
-#     print ("Renaming $dir_to_test to $new_dir_name...\n");
-    
-#     rename ($dir_to_test, $new_dir_name) or die "Can't rename $dir_to_test to $new_dir_name: $!";
-# }
 
 ################################################################################################
 #
@@ -258,3 +204,22 @@ sub select_shorter_list {
         return ($b, $a);
     }
 }
+
+
+# sub find_function {
+#     my @suffixlist = qw (.jpg .tif .gif);
+
+#     my $f = $File::Find::name;
+
+#     my ($name, $path, $suffix) = fileparse ($f, @suffixlist);
+#     # $path =~ s/\/\z//;
+
+#     if ($suffix eq '.tif') {
+#         my @stat = stat ($f);
+#         my $z = $stat[7];
+#         $global_tif_bytecount += $z;
+#     }
+#     elsif (length ($suffix) > 0) {
+#         push (@global_file_list, $f);
+#     }
+# }

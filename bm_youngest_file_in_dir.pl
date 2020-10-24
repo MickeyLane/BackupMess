@@ -63,7 +63,9 @@ if (index ($dir_to_test, '/') != -1) {
     exit (1);
 }
 
-if ($dir_to_test =~ /\d{4} \d{2} \d{2}/) {
+my $i = rindex ($dir_to_test, '\\');
+my $right = substr ($dir_to_test, $i);
+if ($right =~ /\d{4} \d{2} \d{2}/) {
     $dir_to_test_is_just_a_date_string = 1;
 }
 
