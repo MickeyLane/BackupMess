@@ -26,113 +26,78 @@ use List::Util qw (max);
 use lib '.';
 use bm_merge_pics_a;
 use bm_merge_pics_b;
+use bm_merge_pics_i;
 
 package main;
 
-#
-# COMMAND LINE ARGUMENTS
-# ======================
-#
-# Set defaults
-#
 my $dir_to_test = '';
-my $dir_to_test_is_just_a_date_string = 0;
-my $checked_mark = '+';
+my $limit = 9999;
 
-# find (\&initial_find_function, 'E:/Picture Backups');
-
-
-# exit (1);
-
-my $root = 'E:/Picture Backups';
-my @unsorted_list;
-opendir (DIR, $root) or die "Can't open $root: $!";
-while (my $file = readdir (DIR)) {
-    if ($file =~ /\d{4} \d{2} \d{2}/) {
-        push (@unsorted_list, $file);
+#
+#
+# Get input arguments
+#
+foreach my $switch (@ARGV) {
+    print ("\$switch = \"$switch\"\n");
+    if (index ($switch, 'dir=') != -1) {
+        $dir_to_test = lc substr ($switch, 4);
+        print ("\$dir_to_test = $dir_to_test\n");
+        next;
     }
-    else {
-        print ("Ignoring $file\n");
+    elsif (index ($switch, 'limit=') != -1) {
+        $limit = lc substr ($switch, 6);
+        print ("\$limit = $limit\n");
+        next;
     }
-}
-close (DIR);
-my @list = sort (@unsorted_list);
-
-# my $youngest_dt = DateTime->from_epoch (epoch => 10);  # init with *really* old time
-# my $youngest_filename;
-
-# my @dirs_to_test_list = $dir_to_test;
-# my $count = @dirs_to_test_list;
-# while ($count > 0) {
-
-print ("Files:\n");
-my $index = 0;
-foreach my $file (@list) {
-    my $c;
-    if ($index > 0) {
-        $c = sprintf ("%02d %s", $index, $file);
-    }
-    else {
-        $c = sprintf ("   %s", $file);
-    }
-    $index++;
-
-    print ("  $c\n");
-    
-    my $plus = index ($file, '+');
-    if ($plus == -1) {
-        print ("Check $file for youngest file\n");
-        exit (1);
-    }
+    print ("Don't know what to do with $switch\n");
+    die;
 }
 
-print ("Choose: ");
-
-my $choice_int = -1;
-my $choice_string = uc <STDIN>;  # force uppercase
-$choice_string =~ s/[\r\n]+//;
-if ($choice_string =~ /\D/) {
-    print ("Bad answer\n");
-    exit (1);
-}
-$choice_int = int ($choice_string);
-if ($choice_int < 1 || $choice_int >= $index) {
-    print ("Bad answer\n");
-    exit (1);
-}
-
-my $newer_selected_dir = "$root/$list[$choice_int]";
-my $older_selected_dir = "$root/$list[$choice_int - 1]";
-
+#
+# Set up dirs to compare
+#
+my ($newer_selected_dir, $older_selected_dir) = bm_merge_pics_i::select_input_dir_pair ($dir_to_test);
 print ("Comparing \"$newer_selected_dir\" with \"$older_selected_dir\"\n");
 
-undef (@unsorted_list);
-opendir (DIR, $newer_selected_dir) or die "Can't open $newer_selected_dir: $!";
-while (my $file = readdir (DIR)) {
-    if ($file =~ /\d{4}/) {
-        push (@unsorted_list, "$newer_selected_dir/$file");
-    }
+#
+# Get top level dirs in each
+#
+my $newer_list_ptr = find_top_level_dirs ($newer_selected_dir);
+my $older_list_ptr = find_top_level_dirs ($older_selected_dir);
+if (!(defined ($newer_list_ptr)) || !(defined ($older_list_ptr))) {
+    print ("Nothing to do\n");
+    exit (1);
 }
-close (DIR);
-my @newer_list = sort (@unsorted_list);
 
-undef (@unsorted_list);
-opendir (DIR, $older_selected_dir) or die "Can't open $older_selected_dir: $!";
-while (my $file = readdir (DIR)) {
-    if ($file =~ /\d{4}/) {
-        push (@unsorted_list, "$older_selected_dir/$file");
-    }
-}
-close (DIR);
-my @older_list = sort (@unsorted_list);
-
-my ($list_to_prune_ptr, $other_list_ptr) = select_shorter_list (\@newer_list, \@older_list);
+#
+# If different sizes, try to reduce the shorter one
+#
+my ($list_to_prune_ptr, $other_list_ptr) = select_shorter_list ($newer_list_ptr, $older_list_ptr);
 my @list_to_prune = @$list_to_prune_ptr;
 my $list_to_prune_count = @list_to_prune;
 my @other_list = @$other_list_ptr;
 my $other_list_count = @other_list;
 
-print ("List lens are $list_to_prune_count and $other_list_count\n");
+if (0) {
+    my $prune = 'E:/Picture Backups/2016 12 15 +/2001';
+    my $other = 'E:/Picture Backups/2016 12 13 +/2001';
+    my $limit = 1;
+
+    print ("\nCompare $prune and $other\n");
+    my ($prune_hash_ptr) = bm_merge_pics_a::search_sub ($prune, 1);
+    my %prune_hash = %$prune_hash_ptr;
+    my $c = %prune_hash;
+    print ("  Got $c\n");
+    my ($other_hash_ptr) = bm_merge_pics_a::search_sub ($other);
+
+    if (%$prune_hash_ptr && %$other_hash_ptr) {
+        bm_merge_pics_b::compare_hash_dirs ($prune_hash_ptr, $other_hash_ptr, $limit, 1);
+    }
+
+    exit (1);
+}
+
+print ("  List lens are $list_to_prune_count and $other_list_count\n");
 
 my $flag;
 for (my $l2p = 0; $l2p < $list_to_prune_count; $l2p++) {
@@ -140,24 +105,28 @@ for (my $l2p = 0; $l2p < $list_to_prune_count; $l2p++) {
         my $prune = $list_to_prune[$l2p];
         my $other = $other_list[$ol];
 
+        if ($prune eq $other) {
+            print ("Broken\n");
+            exit (1);
+        }
+
         my $i = rindex ($prune, '/');
         my $prune_name = substr ($prune, $i);
 
         $i = rindex ($other, '/');
         my $other_name = substr ($other, $i);
 
+        # print ("  \$prune_name = $prune_name, \$other_name = $other_name\n");
+        
         if ($prune_name eq $other_name) {
-            # my $same = compare_year_dirs ($prune, $other);
-            my ($prune_files_ptr, $prune_files_count, $other_files_ptr, $other_files_count) =
-                bm_merge_pics_a::inventory_year_dirs ($prune, $other);
+            print ("\nCompare $prune and $other\n");
+            my ($prune_hash_ptr) = bm_merge_pics_a::search_sub ($prune);
+            my ($other_hash_ptr) = bm_merge_pics_a::search_sub ($other);
 
-            if ($prune_files_count > 0 && $prune_files_count == $other_files_count) {
-                my $dirs_are_same = bm_merge_pics_b::compare_same_len_dirs ($prune_files_ptr, $other_files_ptr);
-                # File::DirCompare->compare ($prune, $other, sub {$dirs_are_same = 0});
+            # my ($prune_hash_ptr, $other_hash_ptr) = bm_merge_pics_a::inventory_year_dirs ($prune, $other);
 
-                if ($dirs_are_same) {
-                    print ("SAME\n");
-                }
+            if (%$prune_hash_ptr && %$other_hash_ptr) {
+               bm_merge_pics_b::compare_hash_dirs ($prune_hash_ptr, $other_hash_ptr, $limit);
             }
         }
     }
@@ -223,3 +192,43 @@ sub select_shorter_list {
 #         push (@global_file_list, $f);
 #     }
 # }
+
+sub find_top_level_dirs {
+    my $dir = shift;
+
+    my @unsorted_list;
+    opendir (DIR, $dir) or die "Can't open $dir: $!";
+    while (my $file = readdir (DIR)) {
+        if ($file =~ /^\./) {
+            next;
+        }
+
+        if ($file =~ /^\d{4}/) {
+            #
+            # File begines with YYYY
+            #
+            if (length ($file) != 4) {
+                #
+                # But it includes something else
+                #
+                next;
+            }
+        }
+
+        my $fully_qualified_name = "$dir/$file";
+        
+        if (-d $fully_qualified_name) {
+            push (@unsorted_list, $fully_qualified_name);
+        }
+    }
+    closedir (DIR);
+
+    my $count = @unsorted_list;
+    if ($count == 0) {
+        return (undef);
+    }
+
+    my @sorted_list = sort (@unsorted_list);
+
+    return (\@sorted_list);
+}

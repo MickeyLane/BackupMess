@@ -96,6 +96,47 @@ while ($count > 0) {
             next;
         }
         
+        if ($file =~ /^\d{4} \(/ && $file =~ /\)\z/) {
+            # print ("Cleaning up $file\n");
+
+            # my $right_paren = length ($file) - 1;
+            # my $left_paren = 5;
+            # my $content_len = $right_paren - $left_paren - 1;
+            # print ("\$content_len = \"$content_len\"\n");
+
+            # my $paren_contents = lc substr ($file, $left_paren + 1, $content_len);
+            # print ("\$paren_contents = \"$paren_contents\"\n"); 
+
+            # $paren_contents =~ s/edited //;
+            # $paren_contents =~ s/edit //;
+            
+            # print ("\$paren_contents = \"$paren_contents\"\n");
+
+            my $new_file_name = substr ($file, 0, 4);
+
+            # print ("\$file = \"$file\"\n");
+
+            print ("Rename \"$file\" to \"$new_file_name\" [y/n/x] ");
+
+            my $choice_string = uc <STDIN>;  # force uppercase
+            $choice_string =~ s/[\r\n]+//;
+
+            if ($choice_string eq 'Y') {
+                my $new_file = "$dir/$new_file_name";
+                my $old_file = "$dir/$file";
+
+                rename ($old_file, $new_file) or die "Can't rename $file: $!";
+
+                #
+                # Update $file so whatever happens below uses the new name
+                #
+                $file = $new_file_name;
+            }
+            elsif ($choice_string eq 'X') {
+                exit (1);
+            }
+        }
+
         if (-d "$dir/$file") {
             push (@dirs_to_test_list, "$dir/$file");
         }
@@ -109,7 +150,7 @@ while ($count > 0) {
 
 
     }
-    close (DIR);
+    closedir (DIR);
     $count = @dirs_to_test_list;
 }
 
@@ -199,3 +240,22 @@ sub get_file_date_info {
  
     return ($dt);
 }
+
+
+################################################################################################
+#
+#
+#
+# sub remove_last_edit_date {
+#     my $in = shift;
+
+#     print ("\$dir_name = \"$dir_name\"\n");
+
+#     my $paren_string = substr ($in, $left_paren + 1, $right_paren - $left_paren);
+#     print ("\$paren_string = \"$paren_string\"\n");
+
+
+#     exit (1);
+
+#     return (substr ($in, 0, 3));
+# }

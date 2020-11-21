@@ -139,7 +139,7 @@ while ($count > 0) {
 
 
     }
-    close (DIR);
+    closedir (DIR);
     $count = @fq_dirs_to_test_list;
 }
 
@@ -164,7 +164,7 @@ print ("\nThere are $count directories on $drive:\n");
 #             push (@fq_dir_list, $possible_fq_dir);
 #         }
 #     }
-#     close (DIR);
+#     closedir (DIR);
 
 #     return (\@fq_dir_list);
 # }

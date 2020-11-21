@@ -3,30 +3,13 @@ package bm_merge_pics_a;
 use warnings;
 use strict;
 
-sub inventory_year_dirs {
-    my ($prune, $other) = @_;
-    
-    print ("\nCompare $prune and $other\n");
-
-    my ($prune_pic_list_ptr, $prune_tif_bytecount) = search_sub ($prune);
-    my ($other_pic_list_ptr, $other_tif_bytecount) = search_sub ($other);
-
-    if ($prune_tif_bytecount > 0 || $other_tif_bytecount > 0) {
-        print ("Ignoring $prune_tif_bytecount and $other_tif_bytecount bytes of .tif files\n");
-    }
-
-    my $prune_file_count = @$prune_pic_list_ptr;
-    my $other_file_count = @$other_pic_list_ptr;
-    print ("Found $prune_file_count and $other_file_count files\n");
-
-    return ($prune_pic_list_ptr, $prune_file_count, $other_pic_list_ptr, $other_file_count);
-}
-
 sub search_sub {
     my $root = shift;
+    my $debug = shift // 0;
 
-    my @pic_list;
+    my %pic_hash;
     my $tif_bytecount = 0;
+    my $debug_value = 1;
 
     my @dirs_to_test_list = $root;
     my $count = @dirs_to_test_list;
@@ -74,16 +57,37 @@ sub search_sub {
                 $tif_bytecount += $z;
             }
             elsif (length ($suffix) > 0) {
-                push (@pic_list, "$dir/$file");
+                my $key = $file;
+                my $val = "$dir/$file";
+
+                $pic_hash{$key} = $val;
+
+                if ($debug) {
+                    my $string = sprintf ("%03d   {%s} = %s", $debug_value++, $key, $val);
+                    print ("  $string\n");
+                }
             }
         }
-        close (DIR);
+        closedir (DIR);
 
         $count = @dirs_to_test_list;
     }
 
-    my $file_count = @pic_list;
-    return (\@pic_list, $tif_bytecount);
+    if ($tif_bytecount > 0) {
+        print ("  In $root, ignoring $tif_bytecount bytes of .tif files\n");
+    }
+
+    my $key_count = keys %pic_hash;
+    my $hash_count = %pic_hash;
+
+    if ($key_count != $hash_count) {
+        print ("WTF?\n");
+        exit (1);
+    }
+
+    print ("  In $root, found $key_count files\n");
+
+    return (\%pic_hash);
 }
 
 1;
