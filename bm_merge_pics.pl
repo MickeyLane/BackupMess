@@ -26,7 +26,7 @@ use List::Util qw (max);
 use lib '.';
 use bm_merge_pics_a;
 use bm_merge_pics_b;
-use bm_merge_pics_i;
+use bm_merge_pics_select_input;
 
 package main;
 
@@ -56,7 +56,7 @@ foreach my $switch (@ARGV) {
 #
 # Set up dirs to compare
 #
-my ($newer_selected_dir, $older_selected_dir) = bm_merge_pics_i::select_input_dir_pair ($dir_to_test);
+my ($newer_selected_dir, $older_selected_dir) = bm_merge_pics_select_input::select_input_dir_pair ($dir_to_test);
 print ("Comparing \"$newer_selected_dir\" with \"$older_selected_dir\"\n");
 
 #
@@ -77,25 +77,6 @@ my @list_to_prune = @$list_to_prune_ptr;
 my $list_to_prune_count = @list_to_prune;
 my @other_list = @$other_list_ptr;
 my $other_list_count = @other_list;
-
-if (0) {
-    my $prune = 'E:/Picture Backups/2016 12 15 +/2001';
-    my $other = 'E:/Picture Backups/2016 12 13 +/2001';
-    my $limit = 1;
-
-    print ("\nCompare $prune and $other\n");
-    my ($prune_hash_ptr) = bm_merge_pics_a::search_sub ($prune, 1);
-    my %prune_hash = %$prune_hash_ptr;
-    my $c = %prune_hash;
-    print ("  Got $c\n");
-    my ($other_hash_ptr) = bm_merge_pics_a::search_sub ($other);
-
-    if (%$prune_hash_ptr && %$other_hash_ptr) {
-        bm_merge_pics_b::compare_hash_dirs ($prune_hash_ptr, $other_hash_ptr, $limit, 1);
-    }
-
-    exit (1);
-}
 
 print ("  List lens are $list_to_prune_count and $other_list_count\n");
 

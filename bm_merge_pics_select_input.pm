@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-package bm_merge_pics_i;
+package bm_merge_pics_select_input;
 use warnings;
 use strict;
 
