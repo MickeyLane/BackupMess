@@ -23,94 +23,15 @@ use lib '.';
 package main;
 
 #
-# SET PROGRAM PARAMETERS
-# ======================
-#
-# Any variable that begins with 'fq_' is supposed to contain a fully qualified file name
-# Any variable that begins with 'pp_' is a program parameter and is usually a flag to enable
-#   or disable some feature
-# Any variable that begins with 'fp_' is a floating point value. Not used very often
-#
-
-#
 # Set defaults
 #
 my $pp_software_root_dir = 'C:/BackupMess';
 my $pp_database_root_dir = 'C:/BackupMess/db';
 my $pp_root = 'D:/Pictures';
-# my $drive = 'D';
-my $pp_debug_limit = 250;
-
-#
-# COMMAND LINE ARGUMENTS
-# ======================
-
-#
-# Get input arguments
-#
-# my $untested_positive_switch = 'untested_positive=';
-# my $untested_positive_switch_string_len = length ($untested_positive_switch);
-
-# my $max_display_switch = 'cured_max_display=';
-# my $max_display_switch_string_len = length ($max_display_switch);
-
-# my $report_collection_switch = 'report_collection=';
-# my $report_collection_switch_string_len = length ($report_collection_switch);
-
-# foreach my $switch (@ARGV) {
-#     # print ("Switch is \"$switch\"\n");
-#     if (index ($switch, 'drive=') != -1) {
-#         my $temp = substr ($switch, 6);
-
-#         if ($temp ne "") {
-#             $temp =~ s/\:\z//;
-#             if (length ($temp) == 1) {
-#                 $drive = uc $temp;
-#                 next;
-#             }
-#         }
-#     }
-
-#     print ("Don't know what to do with $switch\n");
-#     die;
-# }
-
-# if (length ($drive) != 1) {
-#     print ("No drive specified\n");
-#     die;
-# }
-
-# print ("Checking drive $drive\n");
-
-# my $cwd = Cwd::cwd();
-# print ("\$cwd = $cwd\n");
-
-# chdir ("$drive:");
-
-# $cwd = Cwd::cwd();
-# print ("\$cwd = $cwd\n");
-
-# my $test_drive_root = "$drive:";
-# my $test_drive_id_file = "$test_drive_root\.backup_mess_id";
-
-# my @id_file_records;
-
-# open (FILE, "<", $test_drive_id_file) or die "Can't open $test_drive_id_file: $!";
-
-# while (my $r = <FILE>) {
-#     $r =~ s/[\r\n]+//;
-#     push (@id_file_records, $r);
-# }
-
-# close (FILE);
-
-# foreach my $r (@id_file_records) {
-#     print ("$r\n");
-# }
+my $pp_debug_limit = 1;
 
 my @suffixlist = qw (.jpg .tif .gif .jpeg);
 
-# my @manual_backup_dirs;
 my @fq_pictures;
 my @fq_dirs_tested;
 my @fq_dirs_to_test_list = $pp_root;
@@ -159,14 +80,14 @@ while ($count > 0 && $pp_debug_limit > 0) {
 $count = @fq_dirs_tested;
 print ("\nThere are $count directories under $pp_root\n");
 
-foreach my $d (@fq_pictures) {
-    my ($name, $path, $suffix) = fileparse ($d, @suffixlist);
+my $pics_with_good_dates = 0;
+
+foreach my $fq_picture (@fq_pictures) {
+    my ($name, $path, $suffix) = fileparse ($fq_picture, @suffixlist);
     $path =~ s/\/\z//;
 
-    # print ("$path   $name   $suffix\n");
-
     if ($suffix eq '.jpg' || $suffix eq '.jpeg') {
-        my $image = new Image::MetaData::JPEG ($d);
+        my $image = new Image::MetaData::JPEG ($fq_picture);
         if (!(defined ($image))) {
             my $msg = Image::MetaData::JPEG::Error();
             die "Fail to make image object: $msg";
@@ -174,7 +95,7 @@ foreach my $d (@fq_pictures) {
 
         # print $image->get_description();
 
-        my @report = "$d";
+        my @report = "$fq_picture";
 
         my $should_be_year;
         if ($path =~ /\Q$pp_root/) {
@@ -190,6 +111,7 @@ foreach my $d (@fq_pictures) {
 
         my $image_date_year;
         my $image_date_string;
+        my $image_does_not_have_a_date_flag = 0;
         my $image_dt = get_image_date ($image_data);
         if (defined ($image_dt)) {
             $image_date_string = sprintf ("%04d %02d %02d", $image_dt->year(), $image_dt->month(), $image_dt->day());
@@ -198,6 +120,7 @@ foreach my $d (@fq_pictures) {
         else {
             $image_date_string = "No date in image";
             $image_date_year = "YYYY";
+            $image_does_not_have_a_date_flag = 1;
         }
         
         my $stop_flag = 0;
@@ -221,7 +144,42 @@ foreach my $d (@fq_pictures) {
         if ($stop_flag == 1) {
             last;
         }
+
+        if ($should_be_year ne $image_date_year) {
+            # my $existing_image_date_string = sprintf ("%04d:%02d:%02d", $image_dt->year(), $image_dt->month(), $image_dt->day());
+            my $new_image_date_string = "$should_be_year:07:01 12:00:00";
+            my $new_image_action = 'REPLACE';
+            if ($image_does_not_have_a_date_flag) {
+                $new_image_action = 'ADD';
+                print ("  Adding \"$new_image_date_string\"\n");
+            }
+            else {
+                print ("  Replacing with \"$new_image_date_string\"\n");
+            }
+
+            my $hash_ptr = $image->set_Exif_data ({'DateTime' => $new_image_date_string}, 'IMAGE_DATA', $new_image_action);
+            my %hash = %$hash_ptr;
+            if (%hash) {
+                #
+                #
+                #
+                print ("Error reported from set_Exif_data...\n");
+                while (my ($err_key, $err_val) = each %hash) {
+                    print ("  $err_key   $err_val\n");
+                }
+                die;
+            }
+            else {
+                print ("     Success\n");
+                $image->save ($fq_picture) or die "Save failed";
+            }
+        }
+        else {
+            $pics_with_good_dates++;
+        }
     }
+
+    print ("\$pics_with_good_dates = $pics_with_good_dates\n");
 }
 
 sub get_image_date {
@@ -314,6 +272,9 @@ sub get_image_date {
                     next;
                 }
                 elsif ($ifd_key eq 'XML_Packet') {
+                    next;
+                }
+                elsif ($ifd_key eq 'YCbCrPositioning') {
                     next;
                 }
                 elsif ($ifd_key eq 'PhotoshopImageResources') {
