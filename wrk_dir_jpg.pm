@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 package wrk_dir_jpg;
-use warnings;
+use warnings FATAL => 'all';
 use strict;
 
 use File::Compare;
@@ -26,13 +26,13 @@ sub process_dates_in_jpg_file {
 
     my $should_be_year = wrk_dir_lib::get_should_be_year ($pp_root, $fq_picture);
 
-    if ($name =~ /(\d{4})/) {
-        my $year_in_file_name = $1;
-        if ($year_in_file_name ne $should_be_year) {
-            push (@report, "The file name contains a date that is different from it's filed-under date: $year_in_file_name");
-            die;
-        }
-    }
+    # if ($name =~ /(\d{4})/) {
+    #     my $year_in_file_name = $1;
+    #     if ($year_in_file_name ne $should_be_year) {
+    #         push (@report, "The file name contains a date that is different from it's filed-under date: $year_in_file_name");
+    #         die;
+    #     }
+    # }
 
     my ($new_image_dt, $new_image_date_string) = wrk_dir_lib::make_image_should_be_date ($should_be_year);
 
@@ -219,10 +219,10 @@ sub get_image_date {
                 elsif ($ifd_key eq 'Software') {
                     next;
                 }
-                elsif ($ifd_key eq 'Unknown_tag_59932' || $ifd_key eq 'Unknown_tag_11') {
+                elsif ($ifd_key eq 'Make') {
                     next;
                 }
-                elsif ($ifd_key eq 'Unknown_tag_40093') {
+                elsif ($ifd_key =~ /^Unknown_tag/) {
                     next;
                 }
                 elsif ($ifd_key eq 'YResolution') {
@@ -252,6 +252,9 @@ sub get_image_date {
                 elsif ($ifd_key eq 'Compression') {
                     next;
                 }
+                elsif ($ifd_key eq 'ReferenceBlackWhite') {
+                    next;
+                }
                 elsif ($ifd_key eq 'RowsPerStrip') {
                     next;
                 }
@@ -270,7 +273,16 @@ sub get_image_date {
                 elsif ($ifd_key eq 'XML_Packet') {
                     next;
                 }
-                elsif ($ifd_key eq 'YCbCrPositioning') {
+                elsif ($ifd_key eq 'Model') {
+                    next;
+                }
+                elsif ($ifd_key eq 'JPEGInterchangeFormat') {
+                    next;
+                }
+                elsif ($ifd_key eq 'Model') {
+                    next;
+                }
+                elsif ($ifd_key eq 'YCbCrPositioning' || $ifd_key eq 'YCbCrCoefficients') {
                     next;
                 }
                 elsif ($ifd_key eq 'Artist') {
@@ -299,16 +311,38 @@ sub get_image_date {
 
                 print ("$top_level_key\n");
                 print ("  $ifd_key  $ifd_val\n");
-                die;
+                # die;
             }
         }
         elsif ($top_level_key eq 'IFD1_DATA') {
             my $ifd1_data = $h;
-            while (my ($ifd_key, $ifd_val) = each %$ifd1_data) {
+            while (my ($ifd1_key, $ifd1_val) = each %$ifd1_data) {
+                if ($ifd1_key eq 'Compression') {
+                    next;
+                }
+                elsif ($ifd1_key eq 'XResolution' || $ifd1_key eq 'YResolution') {
+                    next;
+                }
+                elsif ($ifd1_key eq 'ResolutionUnit') {
+                    next;
+                }
+                elsif ($ifd1_key eq 'JPEGInterchangeFormatLength') {
+                    next;
+                }
+                elsif ($ifd1_key eq 'JPEGInterchangeFormat') {
+                    next;
+                }
+                elsif ($ifd1_key eq 'ImageLength' || $ifd1_key eq 'ImageWidth') {
+                    next;
+                }
+                elsif ($ifd1_key =~ /^Unknown_tag/) {
+                    # print ("Ignoring IFD1_DATA tag $ifd1_key\n");
+                    next;
+                }
 
                 print ("$top_level_key\n");
-                print ("  $ifd_key  $ifd_val\n");
-                die;
+                print ("  $ifd1_key  $ifd1_val\n");
+                # die;
             }
         }
         elsif ($top_level_key eq 'ROOT_DATA') {
@@ -319,29 +353,58 @@ sub get_image_date {
             # }
         }
         elsif ($top_level_key eq 'GPS_DATA') {
-            my %gps_data = %$h;
-            my @keys = keys %gps_data;
-            my $count = @keys;
-            if ($count > 0) {
-                print ("  $top_level_key\n");
-                while (my ($dd, $hh) = each %gps_data) {
-                    if ($dd eq 'Orientation') {
-                        my @orientation_records = @$hh;
+            my $gps_data = $h;
+            # my @keys = keys %gps_data;
+            # my $count = @keys;
+            # if ($count > 0) {
+            #     print ("$top_level_key\n");
+            #     while (my ($dd, $hh) = each %gps_data) {
+            #         if ($dd eq 'Orientation') {
+            #             my @orientation_records = @$hh;
 
-                        foreach my $or (@orientation_records) {
-                            print ("    $or\n");
-                        }
-                    }
+            #             foreach my $or (@orientation_records) {
+            #                 print ("    $or\n");
+            #             }
+            #         }
+            #     }
+            # }
+            while (my ($gps_key, $gps_val) = each %$gps_data) {
+                if ($gps_key eq 'Orientation') {
+                    #
+                    # This is an ARRAY
+                    #
+                    my @orientation_records = @$gps_val;
+                    my $count = @orientation_records;
+                    next;
                 }
+                elsif ($gps_key eq 'GPSMapDatum') {
+                    next;
+                }
+                elsif ($gps_key eq 'GPSVersionID') {
+                    next;
+                }
+
+                print ("$top_level_key\n");
+                print ("  $gps_key  $gps_val\n");
+                # die;
             }
         }
         elsif ($top_level_key eq 'INTEROP_DATA') {
             my $interop_data = $h;
-            while (my ($ifd_key, $ifd_val) = each %$interop_data) {
+            while (my ($id_key, $id_val) = each %$interop_data) {
+                if ($id_key eq 'InteroperabilityVersion') {
+                    #
+                    # This is an ARRAY
+                    #
+                    next;
+                }
+                elsif ($id_key eq 'InteroperabilityIndex') {
+                    next;
+                }
 
                 print ("$top_level_key\n");
-                print ("  $ifd_key  $ifd_val\n");
-                die;
+                print ("  $id_key  $id_val\n");
+                # die;
             }
         }
         elsif ($top_level_key eq 'SUBIFD_DATA') {
@@ -364,13 +427,43 @@ sub get_image_date {
                 elsif ($ifd_key eq 'FlashpixVersion') {
                     next;
                 }
+                elsif ($ifd_key eq 'CustomRendered') {
+                    next;
+                }
+                elsif ($ifd_key eq 'SubSecTime') {
+                    next;
+                }
+                elsif ($ifd_key eq 'UserComment') {
+                    next;
+                }
+                elsif ($ifd_key eq 'Contrast') {
+                    next;
+                }
+                elsif ($ifd_key eq 'Saturation') {
+                    next;
+                }
+                elsif ($ifd_key eq 'WhiteBalance') {
+                    next;
+                }
                 elsif ($ifd_key eq 'ExifVersion') {
                     next;
                 }
                 elsif ($ifd_key eq 'ColorSpace') {
                     next;
                 }
+                elsif ($ifd_key eq 'Sharpness') {
+                    next;
+                }
+                elsif ($ifd_key eq 'DigitalZoomRatio') {
+                    next;
+                }
                 elsif ($ifd_key eq 'ComponentsConfiguration') {
+                    next;
+                }
+                elsif ($ifd_key eq 'SceneCaptureType') {
+                    next;
+                }
+                elsif ($ifd_key eq 'ExposureMode') {
                     next;
                 }
                 elsif ($ifd_key eq 'DateTimeOriginal') {
@@ -390,7 +483,86 @@ sub get_image_date {
 
                     next;
                 }
-                elsif ($ifd_key eq 'Unknown_tag_59932') {
+                elsif ($ifd_key eq 'FileSource') {
+                    my @file_source_records = @$ifd_val;
+                    my $count = @file_source_records;
+
+                    foreach my $fsr (@file_source_records) {
+                        print ("  $fsr\n");
+                    }
+
+                    next;
+                }
+                elsif ($ifd_key =~ /^Unknown_tag/) {
+                    next;
+                }
+                elsif ($ifd_key eq 'MeteringMode') {
+                    next;
+                }
+                elsif ($ifd_key eq 'ISOSpeedRatings') {
+                    next;
+                }
+                elsif ($ifd_key eq 'ExposureIndex') {
+                    next;
+                }
+                elsif ($ifd_key eq 'ExposureMode') {
+                    next;
+                }
+                elsif ($ifd_key eq 'LightSource') {
+                    next;
+                }
+                elsif ($ifd_key eq 'ResolutionUnit') {
+                    next;
+                }
+                elsif ($ifd_key eq 'FocalPlaneXResolution' || $ifd_key eq 'FocalPlaneYResolution') {
+                    next;
+                }
+                elsif ($ifd_key eq 'FocalPlaneResolutionUnit') {
+                    next;
+                }
+                elsif ($ifd_key eq 'FocalPlaneResolution') {
+                    next;
+                }
+                elsif ($ifd_key eq 'ExposureBiasValue') {
+                    next;
+                }
+                elsif ($ifd_key eq 'ExposureProgram') {
+                    next;
+                }
+                elsif ($ifd_key eq 'ExposureTime') {
+                    next;
+                }
+                elsif ($ifd_key eq 'ShutterSpeedValue') {
+                    next;
+                }
+                elsif ($ifd_key eq 'BrightnessValue') {
+                    next;
+                }
+                elsif ($ifd_key eq 'MaxApertureValue') {
+                    next;
+                }
+                elsif ($ifd_key eq 'SensingMethod') {
+                    next;
+                }
+                elsif ($ifd_key eq 'ApertureValue') {
+                    next;
+                }
+                elsif ($ifd_key eq 'FocalLength') {
+                    next;
+                }
+                elsif ($ifd_key eq 'SceneType') {
+                    next;
+                }
+                elsif ($ifd_key eq 'SubjectDistance') {
+                    next;
+                }
+                elsif ($ifd_key eq 'Flash') {
+                    next;
+                }
+                elsif ($ifd_key eq 'FNumber') {
+                    next;
+                }
+                elsif ($ifd_key eq 'CompressedBitsPerPixel') {
                     next;
                 }
                 elsif ($ifd_key eq 'SubSecTimeDigitized') {
@@ -400,24 +572,47 @@ sub get_image_date {
                     next;
                 }
                 elsif ($ifd_key eq 'DateTimeDigitized') {
-                    my @time_records = @$ifd_val;
-                    my $count = @time_records;
                     
                     next;
                 }
                 
                 print ("$top_level_key\n");
                 print ("  $ifd_key  $ifd_val\n");
-                die;
+                # die;
             }
         }
         elsif ($top_level_key eq 'MAKERNOTE_DATA') {
             my $makernote_data = $h;
-            while (my ($ifd_key, $ifd_val) = each %$makernote_data) {
-                
+            while (my ($md_key, $md_val) = each %$makernote_data) {
+                if ($md_key eq 'FirmwareVersion') {
+                    next;
+                }
+                elsif ($md_key eq 'CameraSettings') {
+                    next;
+                }
+                elsif ($md_key eq 'CameraSerialNumber') {
+                    next;
+                }
+                elsif ($md_key eq 'ImageType') {
+                    next;
+                }
+                elsif ($md_key eq 'ShotInfo') {
+                    next;
+                }
+                elsif ($md_key eq 'OwnerName') {
+                    next;
+                }
+                elsif ($md_key eq 'Canon-A0Tag') {
+                    next;
+                }
+                elsif ($md_key =~ /^Unknown_tag/) {
+                    # print ("Ignoring MAKERNOTE_DATA tag $md_key\n");
+                    next;
+                }
+
                 print ("$top_level_key\n");
-                print ("  $ifd_key  $ifd_val\n");
-                die;
+                print ("  $md_key  $md_val\n");
+                # die;
             }
         }
         else {

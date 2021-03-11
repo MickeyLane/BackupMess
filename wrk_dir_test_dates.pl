@@ -26,80 +26,68 @@ use wrk_dir_lib;
 
 package main;
 
-#
-# Set defaults
-#
 my $pp_software_root_dir = 'C:/BackupMess';
 my $pp_database_root_dir = 'C:/BackupMess/db';
 my $pp_root = 'D:/Pictures';
+my $test_pic_file;
+my $test_pic_dir;
+my @fq_dirs_to_test_list;
 
 #
 # For debug...
 #
-my $pp_debug_limit = 30;
+# my $pp_debug_limit = 300;
 my $pp_enable_file_writes = 1;
 my $pp_use_test_pic = 0;
-my $test_pic_file;
-my $test_pic_dir;
+my $pp_use_test_dir = 0;
+my $pp_use_cell_phone_pics = 1;
 
-if ($pp_use_test_pic) {
-    $test_pic_dir = 'D:/Pictures/1910';
-    $test_pic_file = $test_pic_dir . '/Eulee Tisdale,1910.jpg';
+if ($pp_use_cell_phone_pics) {
+    $pp_root = 'D:/Picture Directories on Cell Phone';
+}
+
+if ($pp_use_test_dir) {
+    $pp_use_test_pic = 0;
+    if ($pp_use_cell_phone_pics) {
+        $test_pic_dir = 'D:/Picture Directories on Cell Phone/2016 Grand Cayman';
+    }
+    else {
+        $test_pic_dir = 'D:/Pictures/1910';
+    }
+    @fq_dirs_to_test_list = $test_pic_dir;
+}
+elsif ($pp_use_test_pic) {
+    if ($pp_use_cell_phone_pics) {
+        $test_pic_dir = 'D:/Picture Directories on Cell Phone/1975 USNS Vanguard';
+        $test_pic_file = $test_pic_dir . '/09531906.jpg';
+    }
+    else {
+        $test_pic_dir = 'D:/Pictures/1910';
+        $test_pic_file = $test_pic_dir . '/Eulee Tisdale,1910.jpg';
+    }
+    @fq_dirs_to_test_list = $test_pic_dir;
+}
+else {
+    @fq_dirs_to_test_list = $pp_root;
 }
 
 my @suffixlist = qw (.jpg .tif .gif .jpeg);
 
 my @fq_pictures;
 my @fq_dirs_tested;
-my @fq_dirs_to_test_list = $pp_root;
-my $count = @fq_dirs_to_test_list;
 
 #
 # Loop through the directories and make a list of pictures
 #
-if ($pp_use_test_pic == 0) {
-    while ($count > 0 && $pp_debug_limit > 0) {
-        # print ("$count\n");
-        my $fq_dir = shift @fq_dirs_to_test_list;
-        push (@fq_dirs_tested, $fq_dir);
-        opendir (DIR, $fq_dir) or die "Can't open $fq_dir: $!";
-        while (my $fff = readdir (DIR)) {
-            my $ff = lc $fff;
-
-            if ($ff eq 'system volume information') {
-                next;
-            }
-            elsif ($ff eq '.' || $ff eq '..') {
-                next;
-            }
-            elsif ($ff eq '$recycle.bin') {
-                next;
-            }
-            elsif ($ff eq '.tmp.drivedownload') {
-                next;
-            }
-            
-            if (-d "$fq_dir/$ff") {
-                push (@fq_dirs_to_test_list, "$fq_dir/$ff");
-            }
-            else {
-                my $fq_file = "$fq_dir/$ff";
-
-                my ($name, $path, $suffix) = fileparse ($fq_file, @suffixlist);
-                $path =~ s/\/\z//;
-
-                if (length ($suffix) != 0) {
-                    push (@fq_pictures, "$fq_file");
-
-                    $pp_debug_limit--;
-                }
-
-                next;
-            }
-        }
-        closedir (DIR);
-        $count = @fq_dirs_to_test_list;
+if ($pp_use_test_pic == 0 && $pp_use_test_dir == 0) {
+    my $co = @fq_dirs_to_test_list;
+    while ($co > 0) {
+        get_pics_from_dir (\@fq_dirs_tested, \@fq_dirs_to_test_list, \@fq_pictures);
+        $co = @fq_dirs_to_test_list;
     }
+}
+elsif ($pp_use_test_dir == 1) {
+    get_pics_from_dir (\@fq_dirs_tested, \@fq_dirs_to_test_list, \@fq_pictures);
 }
 else {
     print ("Using test pic $test_pic_file\n");
@@ -107,7 +95,7 @@ else {
     push (@fq_pictures, $test_pic_file);
 }
 
-$count = @fq_dirs_tested;
+my $count = @fq_dirs_tested;
 print ("\nThere are $count directories under $pp_root\n");
 $count = @fq_pictures;
 print ("Found $count pictures\n");
@@ -121,6 +109,18 @@ my $pic_number = 1;
 # Loop through all the pictures
 #
 foreach my $fq_picture (@fq_pictures) {
+    if (0 && $pp_use_test_pic == 0 && $pp_use_test_dir == 0) {
+        print ("Do $fq_picture? [ynx] ");
+        my $choice_string = uc <STDIN>;  # force uppercase
+        $choice_string =~ s/[\r\n]+//;
+        if ($choice_string =~ /^X/) {
+            exit (1);
+        }
+        elsif ($choice_string =~ /^N/) {
+            next;
+        }
+    }
+
     my ($name, $path, $suffix) = fileparse ($fq_picture, @suffixlist);
     $path =~ s/\/\z//;
 
@@ -188,6 +188,13 @@ foreach my $fq_picture (@fq_pictures) {
             $pp_root, $fq_picture, $pp_enable_file_writes, $pp_use_test_pic);
         if ($status == 1) {
             $pics_with_good_tag_dates++;
+        }
+        elsif ($status == 4) {
+            $pics_with_good_tag_dates++;
+        }
+        else {
+            print ("\$status = $status\n");
+            die;
         }
     }
     elsif ($suffix eq '.tif') {
@@ -288,3 +295,47 @@ sub write_windows_file_times {
 #     return $ftime;
 # }
 
+sub get_pics_from_dir {
+    my $fq_dirs_tested_ptr = shift;
+    my $fq_dirs_to_test_list_ptr = shift;
+    my $fq_pictures_ptr = shift;
+
+    my $fq_dir = shift @$fq_dirs_to_test_list_ptr;
+
+    push (@$fq_dirs_tested_ptr, $fq_dir);
+    opendir (DIR, $fq_dir) or die "Can't open $fq_dir: $!";
+    while (my $fff = readdir (DIR)) {
+        my $ff = lc $fff;
+
+        if ($ff eq 'system volume information') {
+            next;
+        }
+        elsif ($ff eq '.' || $ff eq '..') {
+            next;
+        }
+        elsif ($ff eq '$recycle.bin') {
+            next;
+        }
+        elsif ($ff eq '.tmp.drivedownload') {
+            next;
+        }
+            
+        if (-d "$fq_dir/$ff") {
+            push (@$fq_dirs_to_test_list_ptr, "$fq_dir/$ff");
+        }
+        else {
+            my $fq_file = "$fq_dir/$ff";
+
+            my ($name, $path, $suffix) = fileparse ($fq_file, @suffixlist);
+            $path =~ s/\/\z//;
+
+            if (length ($suffix) != 0) {
+                push (@$fq_pictures_ptr, "$fq_file");
+            }
+
+            next;
+        }
+    }
+    
+    closedir (DIR);
+}

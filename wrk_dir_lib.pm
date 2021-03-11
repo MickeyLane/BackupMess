@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 package wrk_dir_lib;
-use warnings;
+use warnings FATAL => 'all';
 use strict;
 
 use File::Compare;
